@@ -65,7 +65,7 @@ def get_user_by_email(email):
         return make_response(jsonify(response_body), 200)
     else:
         return make_response(jsonify({"error": "User not found"}), 404)
-    
+
 @app.route('/dishes', methods=['GET'])
 def get_foods():
     foods = []
@@ -87,7 +87,6 @@ def get_foods():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
 
 # class FoodClass(Resource):
 #     def post(self):
