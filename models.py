@@ -32,10 +32,10 @@ class User(db.Model):
     password = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # One-to-Many relationship with Review model
+    
     reviews = db.relationship('Review', backref='user', lazy=True)
 
-    # One-to-Many relationship with Address model
+    
     addresses = db.relationship('Address', backref='user', lazy=True)
 
     def __repr__(self):

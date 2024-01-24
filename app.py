@@ -1,8 +1,12 @@
-from flask import Flask, make_response, jsonify, request
+from flask import Flask, make_response, jsonify, request, json
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
 from models import db, Food, User, Review, Address
+from requests.auth import HTTPBasicAuth
+import requests
+import base64
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -14,6 +18,9 @@ CORS(app)
 migrate = Migrate(app, db)
 
 db.init_app(app)
+
+consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
+consumer_secret='Vh2mvQS4GKyo6seUtpAApN1plTwMDTeqyGZNBEtESYH05sBfRMSddn5vnlJ4zifA'
 
 @app.route('/user', methods=['POST'])
 def register_user():
@@ -166,10 +173,145 @@ def get_user_id_by_email(email):
     else:
         return make_response(jsonify({"error": "User not found"}), 404)
 
+def generate_access_token():
+    mpesa_auth_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
+    response = requests.get(mpesa_auth_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+    data = response.json()
+    return data.get('access_token', '')
+
+
+@app.route('/access_token')
+def token():
+    return jsonify({"access_token": generate_access_token()})
+
+
+@app.route('/stk_push', methods=['POST'])
+def initiate_stk_push():
+    token = generate_access_token()
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    shortCode = "174379"  # vevinah paybill here
+    passkey = "7a6d95bf0a510e19e08c9881e8b48a03"  # vevinah passkey here
+    stk_password = base64.b64encode((shortCode + passkey + timestamp).encode('utf-8')).decode('utf-8')
+
+ 
+    # sandbox
+    url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+    # live
+    # url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+    headers = {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+    }
+
+    data = request.get_json()
+
+    requestBody = {
+        "BusinessShortCode": shortCode,
+        "Password": stk_password,
+        "Timestamp": timestamp,
+        "TransactionType": "CustomerPayBillOnline",  # or "CustomerBuyGoodsOnline"
+        "Amount": data.get('amount', ''),  
+        "PartyA": data.get('phone_number', ''),  
+        "PartyB": shortCode,
+        "PhoneNumber": data.get('phone_number', 'name'),  
+        "CallBackURL": "http://127.0.0.1:5000/callback",
+        "AccountReference": "account",
+        "TransactionDesc": "test"
+    }
+
+    try:
+        response = requests.post(url, json=requestBody, headers=headers)
+        print(response.json())
+        return response.json()
+    except Exception as e:
+        print('Error:', str(e))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/mpesa_transaction', methods=['POST'])
+def mpesa_transaction():
+
+    data = request.get_json()
+
+    user_email = data.get('user_email', '')
+    user = User.query.filter_by(email=user_email).first()
+
+    if user:
+        user.mpesa_access_token = data.get('access_token', '')
+        user.mpesa_transaction_code = data.get('transaction_code', '')
+        db.session.commit()
+
+        return jsonify({"message": "M-Pesa transaction information saved successfully"})
+    else:
+        return jsonify({"error": "User not found"}), 404
+
+
+@app.route('/get_mpesa_transaction/<email>', methods=['GET'])
+def get_mpesa_transaction(email):
+    # M-Pesa transaction - one user
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        response_body = {
+            "user_email": user.email,
+            "mpesa_access_token": user.mpesa_access_token,
+            "mpesa_transaction_code": user.mpesa_transaction_code,
+        }
+        return make_response(jsonify(response_body), 200)
+    else:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+@app.route('/all_mpesa_transactions', methods=['GET'])
+def get_all_mpesa_transactions():
+    all_transactions = User.query.filter(User.mpesa_transaction_code.isnot(None)).all()
+
+    transactions_data = []
+    for user in all_transactions:
+        transaction_data = {
+            "user_email": user.email,
+            "mpesa_access_token": user.mpesa_access_token,
+            "mpesa_transaction_code": user.mpesa_transaction_code,
+        }
+        transactions_data.append(transaction_data)
+
+    return make_response(jsonify(transactions_data), 200)
+
+@app.route('/callback', methods=['POST'])
+def handle_callback():
+    callback_data = request.json
+
+    result_code = callback_data['Body']['stkCallback']['ResultCode']
+    if result_code != 0:
+        error_message = callback_data['Body']['stkCallback']['ResultDesc']
+        response_data = {'ResultCode': result_code, 'ResultDesc': error_message}
+        return jsonify(response_data)
+
+    callback_metadata = callback_data['Body']['stkCallback']['CallbackMetadata']
+    transaction_data = {}
+    for item in callback_metadata['Item']:
+        transaction_data[item['Name']] = item['Value']
+
+    save_transaction_to_json(transaction_data) #saved to json 
+
+    response_data = {'ResultCode': result_code, 'ResultDesc': 'Success'}
+    return jsonify(response_data)
+
+def save_transaction_to_json(data):
+    try:
+        with open('mpesa_transactions.json', 'r') as file:
+            existing_data = json.load(file)
+    except FileNotFoundError:
+        existing_data = []
+
+    existing_data.append(data)
+
+    with open('mpesa_transactions.json', 'w') as file:
+        json.dump(existing_data, file, indent=2)
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
+    app.run(port=5000, debug=True)
 
 # class FoodClass(Resource):
 #     def post(self):
