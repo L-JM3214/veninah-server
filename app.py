@@ -2,7 +2,7 @@ from flask import Flask, make_response, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
-from models import db, Food, User
+from models import db, Food, User, Review, Address
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -49,6 +49,37 @@ def register_user():
 
     return make_response(jsonify(response_body), 201)
 
+@app.route('/reviews', methods=['POST'])
+def submit_review():
+    data = request.get_json()
+
+    required_fields = ['user_email', 'rating']
+    if not all(field in data for field in required_fields):
+        return make_response(jsonify({"error": "Missing required fields"}), 400)
+
+    user = User.query.filter_by(email=data['user_email']).first()
+    if not user:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+    new_review = Review(
+        user_id=user.id,
+        rating=data['rating'],
+        feedback=data.get('feedback', None)
+    )
+
+    db.session.add(new_review)
+    db.session.commit()
+
+    response_body = {
+        "id": new_review.id,
+        "user_email": data['user_email'],
+        "rating": new_review.rating,
+        "feedback": new_review.feedback,
+        "created_at": new_review.created_at,
+    }
+
+    return make_response(jsonify(response_body), 201)
+
 @app.route('/user/<email>', methods=['GET'])
 def get_user_by_email(email):
     user = User.query.filter_by(email=email).first()
@@ -85,8 +116,60 @@ def get_foods():
     )
     return response
 
+@app.route('/address', methods=['POST'])
+def add_address():
+    data = request.get_json()
+
+    required_fields = ['user_email', 'city', 'area', 'street', 'building', 'room']
+    if not all(field in data for field in required_fields):
+        return make_response(jsonify({"error": "Missing required fields"}), 400)
+
+    user = User.query.filter_by(email=data['user_email']).first()
+    if not user:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+    new_address = Address(
+        user_id=user.id,
+        city=data['city'],
+        area=data['area'],
+        street=data['street'],
+        building=data['building'],
+        room=data['room'],
+        notes=data.get('notes', None)
+    )
+
+    db.session.add(new_address)
+    db.session.commit()
+
+    response_body = {
+        "id": new_address.id,
+        "user_email": data['user_email'],
+        "city": new_address.city,
+        "area": new_address.area,
+        "street": new_address.street,
+        "building": new_address.building,
+        "room": new_address.room,
+        "notes": new_address.notes,
+    }
+
+    return make_response(jsonify(response_body), 201)
+
+@app.route('/user/id/<email>', methods=['GET'])
+def get_user_id_by_email(email):
+    user = User.query.filter_by(email=email).first()
+
+    if user:
+        response_body = {
+            "user_id": user.id
+        }
+        return make_response(jsonify(response_body), 200)
+    else:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 # class FoodClass(Resource):
 #     def post(self):
