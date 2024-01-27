@@ -79,23 +79,27 @@ def register_user():
 
     return make_response(jsonify(response_body), 201)
 
-#view users
-@app.route('/user/<email>', methods=['GET'])
-def get_user_by_email(email):
-    user = User.query.filter_by(email=email).first()
-    
-    if user:
-        response_body = {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "phone": user.phone,
-            "created_at": user.created_at,
-        }
-        return make_response(jsonify(response_body), 200)
+# View all users
+@app.route('/users', methods=['GET'])
+def get_all_users():
+    users = User.query.all()
+
+    if users:
+        users_list = []
+        for user in users:
+            user_data = {
+                "id": user.id,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+                "phone": user.phone,
+                "created_at": user.created_at,
+            }
+            users_list.append(user_data)
+
+        return make_response(jsonify(users_list), 200)
     else:
-        return make_response(jsonify({"error": "User not found"}), 404)
+        return make_response(jsonify({"error": "No users found"}), 404)
 
 #collect reviews
 @app.route('/reviews', methods=['POST'])
