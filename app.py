@@ -19,9 +19,32 @@ migrate = Migrate(app, db)
 
 db.init_app(app)
 
+#Mpesa
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
 consumer_secret='Vh2mvQS4GKyo6seUtpAApN1plTwMDTeqyGZNBEtESYH05sBfRMSddn5vnlJ4zifA'
+base_url='https://1115-105-161-25-71.ngrok-free.app'
 
+#Dishes API
+@app.route('/dishes', methods=['GET'])
+def get_foods():
+    foods = []
+    for food in Food.query.all():
+        response_body = {
+            "id": food.id,
+            "name": food.name,
+            "image": food.image,
+            "description": food.description,
+            "price": food.price
+        }
+        foods.append(response_body)
+
+    response = make_response(
+        jsonify(foods),
+        200
+    )
+    return response
+
+#register users
 @app.route('/user', methods=['POST'])
 def register_user():
     data = request.get_json()
@@ -56,6 +79,25 @@ def register_user():
 
     return make_response(jsonify(response_body), 201)
 
+#view users
+@app.route('/user/<email>', methods=['GET'])
+def get_user_by_email(email):
+    user = User.query.filter_by(email=email).first()
+    
+    if user:
+        response_body = {
+            "id": user.id,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "phone": user.phone,
+            "created_at": user.created_at,
+        }
+        return make_response(jsonify(response_body), 200)
+    else:
+        return make_response(jsonify({"error": "User not found"}), 404)
+
+#collect reviews
 @app.route('/reviews', methods=['POST'])
 def submit_review():
     data = request.get_json()
@@ -87,42 +129,7 @@ def submit_review():
 
     return make_response(jsonify(response_body), 201)
 
-@app.route('/user/<email>', methods=['GET'])
-def get_user_by_email(email):
-    user = User.query.filter_by(email=email).first()
-    
-    if user:
-        response_body = {
-            "id": user.id,
-            "first_name": user.first_name,
-            "last_name": user.last_name,
-            "email": user.email,
-            "phone": user.phone,
-            "created_at": user.created_at,
-        }
-        return make_response(jsonify(response_body), 200)
-    else:
-        return make_response(jsonify({"error": "User not found"}), 404)
-
-@app.route('/dishes', methods=['GET'])
-def get_foods():
-    foods = []
-    for food in Food.query.all():
-        response_body = {
-            "id": food.id,
-            "name": food.name,
-            "image": food.image,
-            "description": food.description,
-            "price": food.price
-        }
-        foods.append(response_body)
-
-    response = make_response(
-        jsonify(foods),
-        200
-    )
-    return response
-
+#collect address
 @app.route('/address', methods=['POST'])
 def add_address():
     data = request.get_json()
@@ -161,154 +168,78 @@ def add_address():
 
     return make_response(jsonify(response_body), 201)
 
-@app.route('/user/id/<email>', methods=['GET'])
-def get_user_id_by_email(email):
-    user = User.query.filter_by(email=email).first()
-
-    if user:
-        response_body = {
-            "user_id": user.id
-        }
-        return make_response(jsonify(response_body), 200)
-    else:
-        return make_response(jsonify({"error": "User not found"}), 404)
-
-def generate_access_token():
-    mpesa_auth_url = 'https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials'
-    response = requests.get(mpesa_auth_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
-    data = response.json()
-    return data.get('access_token', '')
-
-
+#access_token
 @app.route('/access_token')
 def token():
-    return jsonify({"access_token": generate_access_token()})
+    data = ac_token
+    return data
 
 
-@app.route('/stk_push', methods=['POST'])
-def initiate_stk_push():
-    token = generate_access_token()
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-    shortCode = "174379"  # vevinah paybill here
-    passkey = "7a6d95bf0a510e19e08c9881e8b48a03"  # vevinah passkey here
-    stk_password = base64.b64encode((shortCode + passkey + timestamp).encode('utf-8')).decode('utf-8')
+def ac_token():
+        mpesa_auth_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+        data= (requests.get(mpesa_auth_url, auth = HTTPBasicAuth(consumer_key, consumer_secret))).json()
+        return data['access_token']
 
- 
-    # sandbox
-    url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
-    # live
-    # url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+#register url
+@app.route('/register_urls')
+def register():
+    mpesa_endpoint = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl" 
+    headers = {"Authorization": "Bearer %s" % ac_token()}
+    req_body = {
+            "ShortCode": "174379",
+            "ResponseType": "",
+            "ConfirmationURL":base_url + "/c2b/confirm",
+            "ValidationURL":base_url + "c2b/validation",
+        },
+    response_data = requests.post(
+        mpesa_endpoint, 
+        json = req_body,
+        headers = headers)
+    
+    return response_data.json()
+    
+@app.route('/c2b/confirm')
+def confirm():
+    data = requests.get_json()
+    #write to file
+    file = open('./confirm.json', 'a')
+    file.write(json.dumps(data))
+    file.close()
 
-    headers = {
-        'Authorization': 'Bearer ' + token,
-        'Content-Type': 'application/json'
+    return {
+        "ResponseCode": "0",
+      "ResponseDescription": "Accept the service request successfully."
     }
 
-    data = request.get_json()
+@app.route('/c2b/validation')
+def validate():
+    data = requests.get_json()
+    #write to file
+    file = open('./confirm.json', 'a')
+    file.write(json.dumps(data))
+    file.close()
 
-    requestBody = {
-        "BusinessShortCode": shortCode,
-        "Password": stk_password,
-        "Timestamp": timestamp,
-        "TransactionType": "CustomerPayBillOnline",  # or "CustomerBuyGoodsOnline"
-        "Amount": data.get('amount', ''),  
-        "PartyA": data.get('phone_number', ''),  
-        "PartyB": shortCode,
-        "PhoneNumber": data.get('phone_number', 'name'),  
-        "CallBackURL": "http://127.0.0.1:5000/callback",
-        "AccountReference": "account",
-        "TransactionDesc": "test"
+    return {
+        "ResponseCode": "0",
+      "ResponseDescription": "Accept the service request successfully."
     }
 
-    try:
-        response = requests.post(url, json=requestBody, headers=headers)
-        print(response.json())
-        return response.json()
-    except Exception as e:
-        print('Error:', str(e))
-        return jsonify({"error": str(e)}), 500
+@app.route('/simulate')
+def simulate():
+    mpesa_endpoint = 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/simulate'
+    access_token = ac_token()
 
+    headers = {"Authorization": "Bearer %s" % ac_token()}
+    request_body = {
+        "ShortCode": "174379",
+        "CommandID": "CustomerPayBillOnline",
+        "BillRefNumber": "TestPay",
+        "Msisdn":"254708374149",
+        "Amount": 50
+    }
+    simulate_response = requests.post(mpesa_endpoint, json = request_body, headers=headers)
 
-@app.route('/mpesa_transaction', methods=['POST'])
-def mpesa_transaction():
-
-    data = request.get_json()
-
-    user_email = data.get('user_email', '')
-    user = User.query.filter_by(email=user_email).first()
-
-    if user:
-        user.mpesa_access_token = data.get('access_token', '')
-        user.mpesa_transaction_code = data.get('transaction_code', '')
-        db.session.commit()
-
-        return jsonify({"message": "M-Pesa transaction information saved successfully"})
-    else:
-        return jsonify({"error": "User not found"}), 404
-
-
-@app.route('/get_mpesa_transaction/<email>', methods=['GET'])
-def get_mpesa_transaction(email):
-    # M-Pesa transaction - one user
-    user = User.query.filter_by(email=email).first()
-
-    if user:
-        response_body = {
-            "user_email": user.email,
-            "mpesa_access_token": user.mpesa_access_token,
-            "mpesa_transaction_code": user.mpesa_transaction_code,
-        }
-        return make_response(jsonify(response_body), 200)
-    else:
-        return make_response(jsonify({"error": "User not found"}), 404)
-
-@app.route('/all_mpesa_transactions', methods=['GET'])
-def get_all_mpesa_transactions():
-    all_transactions = User.query.filter(User.mpesa_transaction_code.isnot(None)).all()
-
-    transactions_data = []
-    for user in all_transactions:
-        transaction_data = {
-            "user_email": user.email,
-            "mpesa_access_token": user.mpesa_access_token,
-            "mpesa_transaction_code": user.mpesa_transaction_code,
-        }
-        transactions_data.append(transaction_data)
-
-    return make_response(jsonify(transactions_data), 200)
-
-@app.route('/callback', methods=['POST'])
-def handle_callback():
-    callback_data = request.json
-
-    result_code = callback_data['Body']['stkCallback']['ResultCode']
-    if result_code != 0:
-        error_message = callback_data['Body']['stkCallback']['ResultDesc']
-        response_data = {'ResultCode': result_code, 'ResultDesc': error_message}
-        return jsonify(response_data)
-
-    callback_metadata = callback_data['Body']['stkCallback']['CallbackMetadata']
-    transaction_data = {}
-    for item in callback_metadata['Item']:
-        transaction_data[item['Name']] = item['Value']
-
-    save_transaction_to_json(transaction_data) #saved to json 
-
-    response_data = {'ResultCode': result_code, 'ResultDesc': 'Success'}
-    return jsonify(response_data)
-
-def save_transaction_to_json(data):
-    try:
-        with open('mpesa_transactions.json', 'r') as file:
-            existing_data = json.load(file)
-    except FileNotFoundError:
-        existing_data = []
-
-    existing_data.append(data)
-
-    with open('mpesa_transactions.json', 'w') as file:
-        json.dump(existing_data, file, indent=2)
-
+    return simulate_response.json()
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
