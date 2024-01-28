@@ -4,6 +4,7 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from models import db, Food, User, Review, Address
 from requests.auth import HTTPBasicAuth
+from flask_restful import Api, Resource, reqparse
 import requests
 import base64
 from datetime import datetime
@@ -133,7 +134,7 @@ def submit_review():
 
     return make_response(jsonify(response_body), 201)
 
-#collect address
+# Collect address
 @app.route('/address', methods=['POST'])
 def add_address():
     data = request.get_json()
@@ -172,78 +173,110 @@ def add_address():
 
     return make_response(jsonify(response_body), 201)
 
-#access_token
-@app.route('/access_token')
-def token():
-    data = ac_token
-    return data
+# View addresses for a user
+@app.route('/addresses/<user_email>', methods=['GET'])
+def get_addresses_by_user(user_email):
+    user = User.query.filter_by(email=user_email).first()
 
+    if user:
+        addresses = Address.query.filter_by(user_id=user.id).all()
+        if addresses:
+            addresses_list = []
+            for address in addresses:
+                address_data = {
+                    "id": address.id,
+                    "user_email": user_email,
+                    "city": address.city,
+                    "area": address.area,
+                    "street": address.street,
+                    "building": address.building,
+                    "room": address.room,
+                    "notes": address.notes,
+                }
+                addresses_list.append(address_data)
 
-def ac_token():
-        mpesa_auth_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
-        data= (requests.get(mpesa_auth_url, auth = HTTPBasicAuth(consumer_key, consumer_secret))).json()
-        return data['access_token']
+            return make_response(jsonify(addresses_list), 200)
+        else:
+            return make_response(jsonify({"error": "No addresses found for the user"}), 404)
+    else:
+        return make_response(jsonify({"error": "User not found"}), 404)
 
-#register url
-@app.route('/register_urls')
-def register():
-    mpesa_endpoint = "https://sandbox.safaricom.co.ke/mpesa/c2b/v1/registerurl" 
-    headers = {"Authorization": "Bearer %s" % ac_token()}
-    req_body = {
-            "ShortCode": "174379",
-            "ResponseType": "",
-            "ConfirmationURL":base_url + "/c2b/confirm",
-            "ValidationURL":base_url + "c2b/validation",
-        },
-    response_data = requests.post(
-        mpesa_endpoint, 
-        json = req_body,
-        headers = headers)
-    
-    return response_data.json()
-    
-@app.route('/c2b/confirm')
-def confirm():
-    data = requests.get_json()
-    #write to file
-    file = open('./confirm.json', 'a')
-    file.write(json.dumps(data))
-    file.close()
+@app.route('/payment')
+def post():
 
-    return {
-        "ResponseCode": "0",
-      "ResponseDescription": "Accept the service request successfully."
-    }
+        # phone_number = request.json['phone']
+        # amount = request.json['amount']
+        parser = reqparse.RequestParser()
+        parser.add_argument('phone', type=str, required = True)
+        parser.add_argument('amount', type=str, required=True)
+        args = parser.parse_args()
 
-@app.route('/c2b/validation')
-def validate():
-    data = requests.get_json()
-    #write to file
-    file = open('./confirm.json', 'a')
-    file.write(json.dumps(data))
-    file.close()
+        phone_number = args['phone']
+        amount = args['amount']
 
-    return {
-        "ResponseCode": "0",
-      "ResponseDescription": "Accept the service request successfully."
-    }
+        consumer_key ="AAa4RjX5YgWolpQsX8b1E6MAZDHH1zRXpfXBWnjfGSWImQEU"
+        consumer_secret = "pPAPZ4X3uvGyfeFpEoziaxR43lRih7PxnHV2FA62sCOgmWwKAnZ5S6sdIlhRwXlf"
+        api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
-@app.route('/simulate')
-def simulate():
-    mpesa_endpoint = 'https://sandbox.safaricom.co.ke/mpesa/c2b/v1/simulate'
-    access_token = ac_token()
+        r = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
 
-    headers = {"Authorization": "Bearer %s" % ac_token()}
-    request_body = {
-        "ShortCode": "174379",
-        "CommandID": "CustomerPayBillOnline",
-        "BillRefNumber": "TestPay",
-        "Msisdn":"254708374149",
-        "Amount": 50
-    }
-    simulate_response = requests.post(mpesa_endpoint, json = request_body, headers=headers)
+        data = r.json()
+        access_token = "Bearer " + data['access_token']
+        timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
+        bussiness_shortcode = '174379'
+        data_to_encode = bussiness_shortcode + passkey + timestamp
+        encoded_data = base64.b64encode(data_to_encode.encode())
+        password = encoded_data.decode('utf-8')
 
-    return simulate_response.json()
+        request = {
+            "BusinessShortCode": bussiness_shortcode,
+            "Password": password,
+            "Timestamp": timestamp, # timestamp format: 20190317202903 yyyyMMhhmmss 
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": amount,
+            "PartyA": f"254{phone_number[1:]}",
+            "PartyB": bussiness_shortcode,
+            "PhoneNumber": f"254{phone_number[1:]}",
+            "CallBackURL": "https://mydomain.com/pat",
+            "AccountReference": "Client",
+            "TransactionDesc": "Client Paid"
+        }
+
+        stk_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+        headers = {"Authorization": access_token, "Content-Type": "application/json"}
+
+        # STK push
+
+        response = requests.post(stk_url,json=request,headers=headers)
+
+        if response.status_code > 299:
+            mpesa_response = {
+                'message':'Failed'
+            }
+            final_response = make_response(
+                jsonify(mpesa_response)
+            )
+
+            return final_response
+        else:
+            message = {
+                'message':'Successful'
+            }
+            response = make_response(
+                jsonify(message)
+            )
+
+            new_data = Payment(
+                number = phone_number,
+                amount = amount
+            )
+
+            db.session.add(new_data)
+            db.session.commit()
+
+            return response
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
