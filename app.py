@@ -2,13 +2,12 @@ from flask import Flask, make_response, jsonify, request, json, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
-from models import db, Food, User, Review, Address
+from models import Address, db, Food, User, Review, Location
 from requests.auth import HTTPBasicAuth
 from flask_restful import Api, Resource, reqparse
 import requests
 import base64
 from datetime import datetime
-from flask_mail import Mail, Message
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -26,8 +25,6 @@ CORS(app)
 migrate = Migrate(app, db)
 
 db.init_app(app)
-
-mail = Mail(app)
 
 #Mpesa
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
@@ -269,7 +266,7 @@ def post():
         db.session.add(new_data)
         db.session.commit()
 
-        return response
+            return response
 
 
 @app.route('/send_confirmation', methods=['POST'])
