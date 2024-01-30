@@ -2,12 +2,13 @@ from flask import Flask, make_response, jsonify, request, json
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
-from models import db, Food, User, Review, Address
+from models import Address, db, Food, User, Review, Location
 from requests.auth import HTTPBasicAuth
 from flask_restful import Api, Resource, reqparse
 import requests
 import base64
 from datetime import datetime
+from sqlalchemy import inspect
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
@@ -19,6 +20,16 @@ CORS(app)
 migrate = Migrate(app, db)
 
 db.init_app(app)
+
+with app.app_context():
+    # Check if the 'foods' table exists
+    db.create_all()
+    inspector = inspect(db.engine)
+        # print all table names
+    if 'foods' in inspector.get_table_names():
+        print(inspector.get_table_names())
+        
+
 
 #Mpesa
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
@@ -277,6 +288,51 @@ def post():
             db.session.commit()
 
             return response
+        
+@app.route('/locations', methods=['GET'])
+def get_locations():
+    locations = []
+    for location in Location.query.all():
+        response_body = {
+            "id": location.id,
+            "name": location.name,
+            "latitude": location.latitude,
+            "longitude": location.longitude,
+            "delivery_fee": location.delivery_fee
+        }
+        locations.append(response_body)
+    response = make_response(
+        jsonify(locations),
+        200
+    )
+    return response
+
+
+@app.route('/locations/<int:id>', methods=['GET'])
+def get_location(id):
+    location = Location.query.get(id)
+    if location is None:
+        return make_response(jsonify({"message": "Location not found"}), 404)
+    response_body = {
+        "id": location.id,
+        "name": location.name,
+        "latitude": location.latitude,
+        "longitude": location.longitude
+    }
+    return make_response(jsonify(response_body), 200)
+
+
+# Get distance from google maps API
+@app.route('/distance', methods=['GET'])
+def get_distance():
+    origin = request.args.get('origins')
+    destination = request.args.get('destinations')
+    api_key = request.args.get('key')
+    url = "https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial&origins={}&destinations={}&key={}".format(
+        origin, destination, api_key)
+    response = requests.get(url)
+    print(response.json())
+    return response.json()
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
