@@ -67,3 +67,15 @@ class Address(db.Model):
 
     def __repr__(self):
         return f"Address(id={self.id}, user_id={self.user_id}, city='{self.city}', area='{self.area}', street='{self.street}', building='{self.building}', room='{self.room}', notes='{self.notes}')"
+
+class Location(db.Model):
+    __tablename__ = 'locations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
+    delivery_fee = db.Column(db.Float, nullable=False)
+
+    def __repr__(self):
+        return f"Location(id={self.id}, name='{self.name}', latitude={self.latitude}, longitude={self.longitude}), delivery_fee={self.delivery_fee})"
