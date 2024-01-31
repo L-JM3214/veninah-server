@@ -1,4 +1,4 @@
-from flask import Flask, make_response, jsonify, request, json, render_template
+from flask import Flask, make_response, jsonify, request, json
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
@@ -8,16 +8,11 @@ from flask_restful import Api, Resource, reqparse
 import requests
 import base64
 from datetime import datetime
+from sqlalchemy import inspect
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'lactorjm3@gmail.com'
-app.config['MAIL_PASSWORD'] = 'zejc ynzq cbkv nupc'
-app.config['MAIL_DEFAULT_SENDER'] = 'lactorjm3@gmail.com'
 app.json.compact = False
 
 CORS(app)
@@ -25,6 +20,16 @@ CORS(app)
 migrate = Migrate(app, db)
 
 db.init_app(app)
+
+with app.app_context():
+    # Check if the 'foods' table exists
+    db.create_all()
+    inspector = inspect(db.engine)
+        # print all table names
+    if 'foods' in inspector.get_table_names():
+        print(inspector.get_table_names())
+        
+
 
 #Mpesa
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
@@ -52,7 +57,7 @@ def get_foods():
     return response
 
 #register users
-@app.route('/user', methods=['POST'])
+@app.route('/users', methods=['POST'])
 def register_user():
     data = request.get_json()
 
@@ -207,66 +212,82 @@ def get_addresses_by_user(user_email):
     else:
         return make_response(jsonify({"error": "User not found"}), 404)
 
-@app.route('/payment', methods=['POST'])
+@app.route('/payment')
 def post():
-    parser = reqparse.RequestParser()
-    parser.add_argument('phone', type=str, required=True)
-    parser.add_argument('amount', type=str, required=True)
-    args = parser.parse_args()
 
-    phone_number = args['phone']
-    amount = args['amount']
+        # phone_number = request.json['phone']
+        # amount = request.json['amount']
+        parser = reqparse.RequestParser()
+        parser.add_argument('phone', type=str, required = True)
+        parser.add_argument('amount', type=str, required=True)
+        args = parser.parse_args()
 
-    consumer_key = "AAa4RjX5YgWolpQsX8b1E6MAZDHH1zRXpfXBWnjfGSWImQEU"
-    consumer_secret = "pPAPZ4X3uvGyfeFpEoziaxR43lRih7PxnHV2FA62sCOgmWwKAnZ5S6sdIlhRwXlf"
-    api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+        phone_number = args['phone']
+        amount = args['amount']
 
-    r = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
+        consumer_key ="AAa4RjX5YgWolpQsX8b1E6MAZDHH1zRXpfXBWnjfGSWImQEU"
+        consumer_secret = "pPAPZ4X3uvGyfeFpEoziaxR43lRih7PxnHV2FA62sCOgmWwKAnZ5S6sdIlhRwXlf"
+        api_url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
-    data = r.json()
-    access_token = "Bearer " + data['access_token']
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')  # Fix this line
-    passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
-    bussiness_shortcode = '174379'
-    data_to_encode = bussiness_shortcode + passkey + timestamp
-    encoded_data = base64.b64encode(data_to_encode.encode())
-    password = encoded_data.decode('utf-8')
+        r = requests.get(api_url, auth=HTTPBasicAuth(consumer_key, consumer_secret))
 
-    request_data = {
-        "BusinessShortCode": bussiness_shortcode,
-        "Password": password,
-        "Timestamp": timestamp,
-        "TransactionType": "CustomerPayBillOnline",
-        "Amount": amount,
-        "PartyA": f"254{phone_number[1:]}",
-        "PartyB": bussiness_shortcode,
-        "PhoneNumber": f"254{phone_number[1:]}",
-        "CallBackURL": "https://mydomain.com/pat",
-        "AccountReference": "Client",
-        "TransactionDesc": "Client Paid"
-    }
+        data = r.json()
+        access_token = "Bearer " + data['access_token']
+        timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
+        bussiness_shortcode = '174379'
+        data_to_encode = bussiness_shortcode + passkey + timestamp
+        encoded_data = base64.b64encode(data_to_encode.encode())
+        password = encoded_data.decode('utf-8')
 
-    stk_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        request = {
+            "BusinessShortCode": bussiness_shortcode,
+            "Password": password,
+            "Timestamp": timestamp, # timestamp format: 20190317202903 yyyyMMhhmmss 
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": amount,
+            "PartyA": f"254{phone_number[1:]}",
+            "PartyB": bussiness_shortcode,
+            "PhoneNumber": f"254{phone_number[1:]}",
+            "CallBackURL": "https://mydomain.com/pat",
+            "AccountReference": "Client",
+            "TransactionDesc": "Client Paid"
+        }
 
-    headers = {"Authorization": access_token, "Content-Type": "application/json"}
+        stk_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
 
-    # STK push
-    response = requests.post(stk_url, json=request_data, headers=headers)
+        headers = {"Authorization": access_token, "Content-Type": "application/json"}
 
-    if response.status_code > 299:
-        mpesa_response = {'message': 'Failed'}
-        final_response = make_response(jsonify(mpesa_response))
-        return final_response
-    else:
-        message = {'message': 'Successful'}
-        response = make_response(jsonify(message))
+        # STK push
 
-        # Assuming Payment is your SQLAlchemy model
-        new_data = Payment(number=phone_number, amount=amount)
-        db.session.add(new_data)
-        db.session.commit()
+        response = requests.post(stk_url,json=request,headers=headers)
 
-        return response
+        if response.status_code > 299:
+            mpesa_response = {
+                'message':'Failed'
+            }
+            final_response = make_response(
+                jsonify(mpesa_response)
+            )
+
+            return final_response
+        else:
+            message = {
+                'message':'Successful'
+            }
+            response = make_response(
+                jsonify(message)
+            )
+
+            new_data = Payment(
+                number = phone_number,
+                amount = amount
+            )
+
+            db.session.add(new_data)
+            db.session.commit()
+
+            return response
 
 
 @app.route('/send_confirmation', methods=['POST'])
