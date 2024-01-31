@@ -266,7 +266,7 @@ def post():
         db.session.add(new_data)
         db.session.commit()
 
-            return response
+        return response
 
 
 @app.route('/send_confirmation', methods=['POST'])
