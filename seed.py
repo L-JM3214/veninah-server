@@ -44,5 +44,5 @@ with app.app_context():
             phone = fake.phone_number(),
         )
         db.session.add(user)
-    db.session.commit()
+        db.session.commit()
 
