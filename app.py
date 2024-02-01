@@ -137,7 +137,7 @@ def submit_review():
 
     response_body = {
         "id": new_review.id,
-        # "user_email": data['user_email'],
+        "user_email": data['user_email'],
         "rating": new_review.rating,
         "feedback": new_review.feedback,
         "created_at": new_review.created_at,
