@@ -27,7 +27,8 @@ typing-extensions = "==4.9.0"
 urllib3 = "==2.1.0"
 uuid = "==1.30"
 werkzeug = "==3.0.1"
-"zope.interface" = "==6.1"
+"zope.interface" = "="6.1"
+marshmallow-sqlalchemy = "*"
 
 [dev-packages]
 
