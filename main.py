@@ -11,6 +11,9 @@ import base64
 from datetime import datetime
 from configuration import db, mash, api, app, auth
 from flask_jwt_extended import create_access_token, jwt_required
+from flask_mail import Mail, Message
+from flask_mail import Message
+import os
 
 #Mpesa
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
@@ -397,6 +400,93 @@ def post():
 
             return response
 
+@app.route('/send_confirmation', methods=['POST'])
+def send_confirmation():
+    print("Attempting network connection...")
+    data = request.get_json()
+
+    # data
+    email = data.get('email')
+    numberOfGuests = data.get('numberOfGuests')
+    tableNumber = data.get('tableNumber')
+
+    # email
+    subject = 'Reservation Confirmation - Chai Vevinah'
+
+    # image
+    logo_filename = 'chai-vevinah-logo.png'
+    logo_path = os.path.join(app.root_path, 'asset', logo_filename)
+    logo_url = f'cid:{logo_filename}'  
+    logo_data = base64.b64encode(open(logo_path, 'rb').read()).decode('utf-8')
+    print(f'Logo Path: {logo_path}')
+
+
+    # email body
+    body = f"""
+    <html>
+        <head>
+            <style>
+                body {{
+                    font-family: 'Arial', sans-serif;
+                    background-color: #f4f4f4;
+                    color: #333;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 20px auto;
+                    padding: 20px;
+                    background-color: #fff;
+                    border-radius: 5px;
+                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }}
+                h1 {{
+                    color: #333;
+                }}
+                p {{
+                    color: #555;
+                }}
+                .logo {{
+                    text-align: center;
+                    margin-bottom: 20px;
+                }}
+                .footer {{
+                    margin-top: 20px;
+                    padding-top: 10px;
+                    border-top: 1px solid #ddd;
+                    text-align: center;
+                    color: #777;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="logo">
+                    <img src="data:image/png;base64,{{ logo_data }}" alt="Chai Vevinah Logo" style="max-width: 100%; height: auto;">
+                </div>
+                <h1>Chai Vevinah Reservation Confirmation</h1>
+                <p>Thank you for choosing Chai Vevinah. Your reservation details are confirmed:</p>
+                <ul>
+                    <li><strong>Number of Guests:</strong> {numberOfGuests}</li>
+                    <li><strong>Table Number:</strong> {tableNumber}</li>
+                </ul>
+                <p>We look forward to serving you. If you have any questions or need further assistance, feel free to contact us.</p>
+                <div class="footer">
+                    <p>Chai Vevinah | Administration</p>
+                </div>
+            </div>
+        </body>
+    </html>
+    """
+
+    # Send
+    try:
+        msg = Message(subject, recipients=[email], html=body)
+        msg.sender = 'lactorjm3@gmail.com'  # sender 
+        mail.send(msg)
+        return jsonify({'success': True, 'message': 'Email sent successfully'})
+    except Exception as e:
+        print(f'Error: {str(e)}')  
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
 if __name__ == '__main__':
     # Modify the database to have pasw
