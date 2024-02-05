@@ -70,7 +70,6 @@ stack-data==0.6.2
 tomli==2.0.1
 traitlets==5.10.1
 typing_extensions==4.9.0
-traceback==0.0.2  
 urllib3==2.1.0
 uuid==1.30
 virtualenv==20.24.5

@@ -499,6 +499,5 @@ def send_confirmation():
         return jsonify({'success': False, 'message': f'Error: {str(e)}', 'traceback': traceback_str})
 
 
-
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
