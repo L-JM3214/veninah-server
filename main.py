@@ -433,43 +433,36 @@ def send_confirmation():
         <html>
             <head>
                 <style>
-                    body {{
+                    body {
                         font-family: 'Arial', sans-serif;
                         background-color: #f4f4f4;
                         color: #333;
-                    }}
-                    .container {{
+                    }
+                    .container {
                         max-width: 600px;
                         margin: 20px auto;
                         padding: 20px;
                         background-color: #fff;
                         border-radius: 5px;
                         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                    }}
-                    h1 {{
+                    }
+                    h1 {
                         color: #333;
-                    }}
-                    p {{
+                    }
+                    p {
                         color: #555;
-                    }}
-                    .logo {{
-                        text-align: center;
-                        margin-bottom: 20px;
-                    }}
-                    .footer {{
+                    }
+                    .footer {
                         margin-top: 20px;
                         padding-top: 10px;
                         border-top: 1px solid #ddd;
                         text-align: center;
                         color: #777;
-                    }}
+                    }
                 </style>
             </head>
             <body>
                 <div class="container">
-                    <div class="logo">
-                        <img src="data:image/png;base64,{{ logo_data }}" alt="Chai Vevinah Logo" style="max-width: 100%; height: auto;">
-                    </div>
                     <h1>Chai Vevinah Reservation Confirmation</h1>
                     <p>Thank you for choosing Chai Vevinah. Your reservation details are confirmed:</p>
                     <ul>
