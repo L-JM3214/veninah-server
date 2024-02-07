@@ -14,6 +14,7 @@ from flask_jwt_extended import create_access_token, jwt_required
 from flask_mail import Message
 from flask_mail import Mail
 import traceback
+from requests.auth import HTTPBasicAuth
 import os
 
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
