@@ -4,7 +4,7 @@ from configuration import db, mash, api, app
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_migrate import Migrate
-from models import Address, Food, User, Review, Location, Reservation, Order, OrderItem
+from models import Address, Food, User, Review, Location, Reservation, Order, OrderItem, Payment
 from flask_restful import Api, Resource, reqparse
 import requests
 import base64
@@ -147,13 +147,17 @@ api.add_resource(Users, '/users')
 class Signup(Resource):
     def post(self):
         user = request.get_json()
-        # check whether the user exists via their email
+
+        # Validate password not emplty
+        if not user['password']:
+            return make_response("Password must not be empty", 400)
+
+        # Check that user exists - email
         user_exists = User.query.filter_by(email=user['email']).first()
 
         if user_exists:
-            return make_response(
-                "User already exists", 400
-            )
+            return make_response("User already exists", 400)
+
         new_user = User(
             first_name=user['first_name'],
             last_name=user['last_name'],
@@ -170,7 +174,6 @@ class Signup(Resource):
             'email': new_user.email,
             'phone': new_user.phone,
         }, 200)
-
 
 api.add_resource(Signup, '/signup')
 
@@ -352,7 +355,7 @@ def post():
 
         data = r.json()
         access_token = "Bearer " + data['access_token']
-        timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
         passkey = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919"
         bussiness_shortcode = '174379'
         data_to_encode = bussiness_shortcode + passkey + timestamp
