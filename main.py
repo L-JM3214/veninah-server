@@ -8,7 +8,7 @@ from models import Address, Food, User, Review, Location, Reservation, Order, Or
 from flask_restful import Api, Resource, reqparse
 import requests
 import base64
-from DateTime import datetime
+from datetime import datetime
 from configuration import db, mash, api, app, auth
 from flask_jwt_extended import create_access_token, jwt_required
 from flask_mail import Message
