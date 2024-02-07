@@ -330,7 +330,7 @@ api.add_resource(DistanceResource, '/distance')
 
 
 # MPESA PAYMENT
-@app.route('/payment')
+@app.route('/payment', methods=['GET', 'POST'])
 def post():
 
         # phone_number = request.json['phone']
