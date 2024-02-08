@@ -10,7 +10,7 @@ from flask_bcrypt import Bcrypt
 from flask_httpauth import HTTPBasicAuth
 from flask_jwt_extended import JWTManager
 
-app = Flask(__name__)
+app = Flask(__name__ , static_url_path='/static')
 
 db = SQLAlchemy()
 
@@ -24,6 +24,7 @@ app.config['JWT_SECRET_KEY'] = 'secret-key'
 migrate = Migrate(app, db)
 CORS(app)
 api = Api(app)
+
 
 db.init_app(app)
 jwt = JWTManager(app)

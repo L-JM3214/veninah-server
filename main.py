@@ -27,6 +27,7 @@ app.config['MAIL_DEFAULT_SENDER'] = 'lactorjm3@gmail.com'
 consumer_key='7GSlEmZiocYKga9acUBDyIYiuJqOvZvHd6XGzbcVZadPm93f'
 consumer_secret='Vh2mvQS4GKyo6seUtpAApN1plTwMDTeqyGZNBEtESYH05sBfRMSddn5vnlJ4zifA'
 base_url='https://1115-105-161-25-71.ngrok-free.app'
+mail = Mail(app)
 
 
 
@@ -428,7 +429,7 @@ def send_confirmation():
         # image
         logo_filename = 'chai-vevinah-logo.png'
         logo_path = os.path.join(app.root_path, 'asset', logo_filename)
-        logo_url = f'cid:{logo_filename}'  
+        logo_url = logo_url = f'/static/asset/{logo_filename}'
         logo_data = base64.b64encode(open(logo_path, 'rb').read()).decode('utf-8')
         print(f'Logo Path: {logo_path}')
 
@@ -437,32 +438,43 @@ def send_confirmation():
         <html>
             <head>
                 <style>
-                    body {
+                    body {{
                         font-family: 'Arial', sans-serif;
                         background-color: #f4f4f4;
                         color: #333;
-                    }
-                    .container {
+                        margin: 0;
+                        padding: 0;
+                    }}
+                    .container {{
                         max-width: 600px;
                         margin: 20px auto;
                         padding: 20px;
                         background-color: #fff;
-                        border-radius: 5px;
+                        border-radius: 8px;
                         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                    }
-                    h1 {
+                    }}
+                    h1 {{
                         color: #333;
-                    }
-                    p {
+                        text-align: center;
+                    }}
+                    p {{
                         color: #555;
-                    }
-                    .footer {
+                        line-height: 1.6;
+                    }}
+                    ul {{
+                        list-style: none;
+                        padding: 0;
+                    }}
+                    li {{
+                        margin-bottom: 10px;
+                    }}
+                    .footer {{
                         margin-top: 20px;
                         padding-top: 10px;
                         border-top: 1px solid #ddd;
                         text-align: center;
                         color: #777;
-                    }
+                    }}
                 </style>
             </head>
             <body>
@@ -476,7 +488,6 @@ def send_confirmation():
                     <p>We look forward to serving you. If you have any questions or need further assistance, feel free to contact us.</p>
                     <div class="footer">
                         <p>Chai Vevinah | Administration</p>
-                    </div>
                 </div>
             </body>
         </html>
@@ -486,7 +497,7 @@ def send_confirmation():
         msg = Message(subject, recipients=[email], html=body)
         msg.sender = 'your-gmail-account@gmail.com'  # Replace with your Gmail account
         mail.send(msg)
-        
+
         return jsonify({'success': True, 'message': 'Email sent successfully'})
     except Exception as e:
         traceback_str = traceback.format_exc()
@@ -494,7 +505,6 @@ def send_confirmation():
         print(f'Traceback: {traceback_str}')
 
         return jsonify({'success': False, 'message': f'Error: {str(e)}', 'traceback': traceback_str})
-
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
